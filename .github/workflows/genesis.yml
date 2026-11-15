@@ -1,0 +1,36 @@
+name: Small Genesis emulator pack
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download EmulatorJS and keep only the Sega Genesis part
+        run: |
+          set -e
+          sudo apt-get update -y
+          sudo apt-get install -y p7zip-full
+          URL=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/EmulatorJS/EmulatorJS/releases/latest \
+            | grep -oE '"browser_download_url": *"[^"]+\.7z"' | head -1 \
+            | sed -E 's/.*"(https?:[^"]+)"/\1/')
+          echo "Downloading: $URL"
+          curl -L -o ejs.7z "$URL"
+          7z x -y -oex ejs.7z > /dev/null
+          LOADER=$(find ex -name loader.js | head -1)
+          SRC=$(dirname "$LOADER")
+          mkdir -p out/data
+          cp -r "$SRC"/. out/data/
+          find out/data/cores -type f ! -iname '*genesis_plus_gx*' -delete
+          find out/data -type d -empty -delete
+          echo "---- biggest files ----"
+          find out/data -type f -exec du -k {} + | sort -n | tail -10
+          echo "---- total ----"
+          du -sh out/data
+      - name: Upload the small pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-emulator-data
+          path: out/data
